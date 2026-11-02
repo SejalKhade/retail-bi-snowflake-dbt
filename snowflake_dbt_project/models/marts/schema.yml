@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: fct_orders
+    description: "Central order fact table — one row per order, enriched with customer segment"
+    columns:
+      - name: order_id
+        tests: [unique, not_null]
+      - name: order_date
+        tests: [not_null]
+      - name: status
+        tests:
+          - accepted_values:
+              values: ['completed','cancelled','returned']
+      - name: net_revenue
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"
+      - name: channel
+        tests:
+          - accepted_values:
+              values: ['online','in-store','mobile']
+
+  - name: fct_order_items
+    description: "Line-item fact with product and order context"
+    columns:
+      - name: item_id
+        tests: [unique, not_null]
+      - name: order_id
+        tests: [not_null]
+      - name: margin_pct
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: "BETWEEN -100 AND 100"
+
+  - name: dim_product
+    description: "Product dimension — current snapshot"
+    columns:
+      - name: product_id
+        tests: [unique, not_null]
+      - name: standard_margin_pct
+        tests:
+          - dbt_utils.expression_is_true:
+              expression: ">= 0"

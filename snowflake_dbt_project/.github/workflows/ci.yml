@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  dbt-and-api-tests:
+    runs-on: ubuntu-latest
+
+    env:
+      SNOWFLAKE_ACCOUNT:  ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER:     ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      DBT_PROFILES_DIR:   ${{ github.workspace }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── dbt ──────────────────────────────────────────────────────────────────
+      - name: dbt deps
+        run: dbt deps
+
+      - name: dbt build (compile + test + run)
+        run: dbt build --target prod
+
+      # ── pytest (mocked -- no Snowflake needed) ────────────────────────────
+      - name: Run API tests
+        run: |
+          pytest tests/test_api.py -v \
+            --cov=app \
+            --cov-report=term-missing \
+            --cov-fail-under=85
+
+      - name: Lint (ruff, non-blocking)
+        run: |
+          pip install ruff --quiet
+          ruff check app.py scripts/ || true
